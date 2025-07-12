@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaUserAlt, FaLock, FaEye, FaEyeSlash, FaPaperPlane } from 'react-icons/fa';
 
-// ✅ Use relative path so vercel.json can handle routing
-const BASE_URL = "/api/auth";
+const BASE_URL = "/api/auth"; // Relative path so Vercel handles it via vercel.json
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -33,7 +32,6 @@ export default function Auth() {
 
     try {
       const endpoint = isLogin ? "/login" : "/register";
-
       const res = await fetch(`${BASE_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -41,14 +39,18 @@ export default function Auth() {
       });
 
       const data = await res.json();
+      console.log("Login/Register response:", data); // ✅ Debug response
 
-      if (!res.ok) {
+      if (!res.ok || !data.token) {
         throw new Error(data.message || "Something went wrong");
       }
 
       localStorage.setItem("token", data.token);
+      console.log("Token saved:", localStorage.getItem("token")); // ✅ Confirm token saved
+
       navigate("/chat");
     } catch (err) {
+      console.error("Auth error:", err);
       setError(err.message);
     } finally {
       setLoading(false);
