@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "https://your-backend.onrender.com/api/$1"
+      "destination": "https://chatverse-8ka6.onrender.com"
     }
   ]
 }
