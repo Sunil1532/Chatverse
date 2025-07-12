@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 
-const SOCKET_URL = 'http://localhost:5000';
+// ✅ Replace localhost with deployed backend
+const API_BASE_URL = 'https://chatverse-8ka6.onrender.com';
+const SOCKET_URL = 'https://chatverse-8ka6.onrender.com';
 
 export default function ChatPage() {
   const { roomId } = useParams();
@@ -24,7 +26,10 @@ export default function ChatPage() {
   }, [token]);
 
   useEffect(() => {
-    const s = io(SOCKET_URL, { auth: { token } });
+    const s = io(SOCKET_URL, {
+      auth: { token },
+      transports: ['websocket'], // Helps avoid CORS issues
+    });
 
     s.on('connect', () => {
       s.emit('joinRoom', { roomId });
@@ -47,7 +52,7 @@ export default function ChatPage() {
 
   useEffect(() => {
     const fetchMessages = async () => {
-      const res = await fetch(`${SOCKET_URL}/api/rooms/${roomId}/messages`, {
+      const res = await fetch(`${API_BASE_URL}/api/rooms/${roomId}/messages`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -81,8 +86,9 @@ export default function ChatPage() {
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(`${SOCKET_URL}/api/upload`, {
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
 
@@ -147,13 +153,13 @@ export default function ChatPage() {
                     <div className="mt-2">
                       {isImage ? (
                         <img
-                          src={SOCKET_URL + msg.file}
+                          src={API_BASE_URL + msg.file}
                           alt="uploaded"
                           className="rounded max-w-[200px]"
                         />
                       ) : (
                         <a
-                          href={SOCKET_URL + msg.file}
+                          href={API_BASE_URL + msg.file}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="text-blue-300 underline"
@@ -186,31 +192,29 @@ export default function ChatPage() {
       </div>
 
       <form
-  onSubmit={handleSend}
-  className="p-4 flex gap-2 bg-white/10 backdrop-blur-sm border-t border-white/20 items-center"
->
-  <input
-    value={newMsg}
-    onChange={handleChange}
-    placeholder="Type a message..."
-    className="flex-1 bg-white/20 placeholder-white/70 text-white p-2 rounded-lg focus:outline-none"
-  />
+        onSubmit={handleSend}
+        className="p-4 flex gap-2 bg-white/10 backdrop-blur-sm border-t border-white/20 items-center"
+      >
+        <input
+          value={newMsg}
+          onChange={handleChange}
+          placeholder="Type a message..."
+          className="flex-1 bg-white/20 placeholder-white/70 text-white p-2 rounded-lg focus:outline-none"
+        />
 
-  {/* File Upload Button with + icon */}
-  <label className="relative cursor-pointer bg-white/20 text-white px-3 py-2 rounded-lg hover:bg-white/30 transition">
-    <span className="text-lg font-bold">+</span>
-    <input
-      type="file"
-      onChange={handleFileChange}
-      className="absolute inset-0 opacity-0 cursor-pointer"
-    />
-  </label>
+        <label className="relative cursor-pointer bg-white/20 text-white px-3 py-2 rounded-lg hover:bg-white/30 transition">
+          <span className="text-lg font-bold">+</span>
+          <input
+            type="file"
+            onChange={handleFileChange}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+          />
+        </label>
 
-  <button className="bg-yellow-300 text-purple-800 px-4 rounded-lg font-semibold hover:scale-105 transition">
-    Send
-  </button>
-</form>
-
+        <button className="bg-yellow-300 text-purple-800 px-4 rounded-lg font-semibold hover:scale-105 transition">
+          Send
+        </button>
+      </form>
     </div>
   );
 }

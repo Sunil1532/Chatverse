@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const BASE_URL = 'http://localhost:5000/api/rooms';
+// ✅ Replaced localhost with Render deployment URL
+const BASE_URL = 'https://chatverse-8ka6.onrender.com/api/rooms';
 
 export default function RoomPage() {
   const [rooms, setRooms] = useState([]);
@@ -89,7 +90,7 @@ export default function RoomPage() {
               type="checkbox"
               checked={isPrivate}
               onChange={(e) => setIsPrivate(e.target.checked)}
-            />{' '}
+            />
             <span>Private Room</span>
           </label>
           <button className="w-full bg-yellow-300 text-purple-900 py-2 rounded hover:scale-[1.01] transition">

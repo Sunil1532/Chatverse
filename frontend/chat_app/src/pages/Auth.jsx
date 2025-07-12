@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaUserAlt, FaLock, FaEye, FaEyeSlash, FaPaperPlane } from 'react-icons/fa';
 
-const BASE_URL = "http://localhost:5000/api/auth";
+// ✅ Use relative path so vercel.json can handle routing
+const BASE_URL = "/api/auth";
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
