@@ -48,6 +48,9 @@ const io = new Server(server, {
 
 // ✅ Now use the socket handler!
 socketHandler(io);
+app.get('/', (req, res) => {
+  res.send('✅ ChatVerse Backend is running!');
+});
 
 const PORT = process.env.PORT || 5001;
 server.listen(PORT, () =>
