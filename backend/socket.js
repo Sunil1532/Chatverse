@@ -85,9 +85,55 @@ export default function socketHandler(io) {
       }
     });
 
-    // Disconnect
+    // ======== New WebRTC signaling / call events ========
+    // Caller/participant will call 'joinCall' to start/join the call room for roomId
+    socket.on('joinCall', async ({ roomId }) => {
+      try {
+        const callRoom = `call_${roomId}`;
+        socket.join(callRoom);
+
+        // gather other participants in the call room
+        const clients = Array.from(io.sockets.adapter.rooms.get(callRoom) || []);
+        const otherClients = clients.filter(id => id !== socket.id);
+
+        // send back existing participants so the caller can create offers
+        socket.emit('all-call-users', otherClients);
+
+        // notify others that a new user joined call
+        socket.to(callRoom).emit('user-joined-call', { socketId: socket.id });
+      } catch (err) {
+        console.error('❌ joinCall error:', err);
+      }
+    });
+
+    // Generic signal forwarder: payload signal can be { type: 'offer'|'answer'|'ice', sdp?, candidate? }
+    socket.on('signal', ({ to, from, signal }) => {
+      if (!to) return;
+      // forward to specific socket id
+      io.to(to).emit('signal', { from, signal });
+    });
+
+    socket.on('leaveCall', ({ roomId }) => {
+      try {
+        const callRoom = `call_${roomId}`;
+        socket.leave(callRoom);
+        socket.to(callRoom).emit('user-left-call', { socketId: socket.id });
+      } catch (err) {
+        console.error('❌ leaveCall error:', err);
+      }
+    });
+
+    // When socket disconnects, notify all call rooms they were part of
     socket.on('disconnect', () => {
       console.log(`🔌 Socket disconnected: ${socket.id}`);
+      // find rooms this socket was in and emit user-left-call for any call_ rooms
+      socket.rooms.forEach((r) => {
+        if (typeof r === 'string' && r.startsWith('call_')) {
+          socket.to(r).emit('user-left-call', { socketId: socket.id });
+        }
+      });
     });
+
+    // ======== end signaling ========
   });
 }

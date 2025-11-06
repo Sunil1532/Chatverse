@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { FaUserAlt, FaLock, FaEye, FaEyeSlash, FaPaperPlane } from 'react-icons/fa';
-
-const BASE_URL = "/api/auth"; // Relative path so Vercel handles it via vercel.json
+const BASE_URL =
+  import.meta.env.MODE === "production"
+    ? "https://chatverse-8ka6.onrender.com/api/auth"
+    : "http://localhost:5000/api/auth";
+ // Relative path so Vercel handles it via vercel.json
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);

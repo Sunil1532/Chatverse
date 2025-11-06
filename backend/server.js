@@ -2,7 +2,6 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
-import mongoose from 'mongoose';
 import cors from 'cors';
 import uploadRoutes from './routes/uploads.js';
 
@@ -10,7 +9,7 @@ import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
 import roomRoutes from './routes/roomRoutes.js';
 import User from './models/User.js';
-import socketHandler from './socket.js'; // ✅ ADD THIS
+import socketHandler from './socket.js'; 
 
 dotenv.config();
 connectDB();
