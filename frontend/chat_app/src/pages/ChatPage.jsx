@@ -39,32 +39,30 @@ export default function ChatPage() {
 
   // ✅ ✅ ✅ TURN SERVER ADDED HERE
   const RTC_CONFIG = {
-    iceServers: [
-      {
-        urls: "stun:stun.relay.metered.ca:80",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80",
-        username: "2392c8e3c12a32a936886974",
-        credential: "TlNMnv8gf9SA0Ecq",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        username: "2392c8e3c12a32a936886974",
-        credential: "TlNMnv8gf9SA0Ecq",
-      },
-      {
-        urls: "turn:global.relay.metered.ca:443",
-        username: "2392c8e3c12a32a936886974",
-        credential: "TlNMnv8gf9SA0Ecq",
-      },
-      {
-        urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        username: "2392c8e3c12a32a936886974",
-        credential: "TlNMnv8gf9SA0Ecq",
-      },
-    ],
-  };
+  iceServers: [
+    { urls: import.meta.env.VITE_STUN_URL },
+    {
+      urls: import.meta.env.VITE_TURN_URL_80,
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    },
+    {
+      urls: import.meta.env.VITE_TURN_URL_80_TCP,
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    },
+    {
+      urls: import.meta.env.VITE_TURN_URL_443,
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    },
+    {
+      urls: import.meta.env.VITE_TURN_URL_443_TCP,
+      username: import.meta.env.VITE_TURN_USERNAME,
+      credential: import.meta.env.VITE_TURN_CREDENTIAL,
+    },
+  ],
+};
 
   /***** ==== SOCKET + CHAT ==== *****/
   useEffect(() => {
