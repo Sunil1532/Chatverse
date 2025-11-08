@@ -14,6 +14,10 @@ export default function ChatPage() {
   const [newMsg, setNewMsg] = useState('');
   const [file, setFile] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
+
+  // ✅ ✅ NEW STATE ADDED (Online + Last Seen)
+  const [userStatuses, setUserStatuses] = useState({});
+
   const messagesEndRef = useRef();
   const token = localStorage.getItem('token');
 
@@ -37,34 +41,38 @@ export default function ChatPage() {
   const [showCallPopup, setShowCallPopup] = useState(false);
   const [callMode, setCallMode] = useState('video');
 
-  // ✅ ✅ ✅ TURN SERVER ADDED HERE
-  const RTC_CONFIG = {
-  iceServers: [
-    { urls: import.meta.env.VITE_STUN_URL },
-    {
-      urls: import.meta.env.VITE_TURN_URL_80,
-      username: import.meta.env.VITE_TURN_USERNAME,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL,
-    },
-    {
-      urls: import.meta.env.VITE_TURN_URL_80_TCP,
-      username: import.meta.env.VITE_TURN_USERNAME,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL,
-    },
-    {
-      urls: import.meta.env.VITE_TURN_URL_443,
-      username: import.meta.env.VITE_TURN_USERNAME,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL,
-    },
-    {
-      urls: import.meta.env.VITE_TURN_URL_443_TCP,
-      username: import.meta.env.VITE_TURN_USERNAME,
-      credential: import.meta.env.VITE_TURN_CREDENTIAL,
-    },
-  ],
-};
+  // ====== VOICE MESSAGE STATE/REFS (ADDED) ======
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  /***** ==== SOCKET + CHAT ==== *****/
+  const RTC_CONFIG = {
+    iceServers: [
+      { urls: import.meta.env.VITE_STUN_URL },
+      {
+        urls: import.meta.env.VITE_TURN_URL_80,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL,
+      },
+      {
+        urls: import.meta.env.VITE_TURN_URL_80_TCP,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL,
+      },
+      {
+        urls: import.meta.env.VITE_TURN_URL_443,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL,
+      },
+      {
+        urls: import.meta.env.VITE_TURN_URL_443_TCP,
+        username: import.meta.env.VITE_TURN_USERNAME,
+        credential: import.meta.env.VITE_TURN_CREDENTIAL,
+      },
+    ],
+  };
+
+  /***** ==== SOCKET + CHAT ====*****/
   useEffect(() => {
     const s = io(SOCKET_URL, {
       auth: { token },
@@ -73,6 +81,14 @@ export default function ChatPage() {
 
     s.on('connect', () => {
       s.emit('joinRoom', { roomId });
+    });
+
+    // ✅ NEW: Listen for online/offline updates
+    s.on('userStatus', ({ userId, online, lastSeen }) => {
+      setUserStatuses((prev) => ({
+        ...prev,
+        [userId]: { online, lastSeen },
+      }));
     });
 
     s.on('newMessage', (msg) => {
@@ -106,7 +122,9 @@ export default function ChatPage() {
     setSocket(s);
 
     return () => {
-      try { s.disconnect(); } catch {}
+      try {
+        s.disconnect();
+      } catch {}
     };
   }, [roomId, token]);
 
@@ -178,16 +196,13 @@ export default function ChatPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  /***** ==== WEBRTC CORE ==== *****/
-
+  /***** ==== WEBRTC CORE ====*****/
   const getLocalMedia = async (wantVideo = true) => {
     try {
       if (localStreamRef.current) {
         if (!wantVideo)
           localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = false));
-        else
-          localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = true));
-
+        else localStreamRef.current.getVideoTracks().forEach((t) => (t.enabled = true));
         return localStreamRef.current;
       }
 
@@ -361,13 +376,106 @@ export default function ChatPage() {
     });
   };
 
-  /***** ==== UI RENDER ==== *****/
+  // ====== VOICE RECORDING FUNCTIONS (ADDED) ======
+  const startRecording = async () => {
+    try {
+      // Request mic
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+
+      const recorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = async () => {
+        try {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          // Convert to mp3-like filename (server handles actual mime)
+          const audioFile = new File([audioBlob], `voice-${Date.now()}.webm`, {
+            type: 'audio/webm',
+          });
+
+          const formData = new FormData();
+          formData.append('file', audioFile);
+
+          const res = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+
+          const data = await res.json();
+          const audioUrl = data.url; // keep same pattern as other uploads
+
+          // Emit as normal chatMessage with file pointing to uploaded audio
+          socket.emit('chatMessage', {
+            roomId,
+            text: '',
+            file: audioUrl,
+          });
+        } catch (err) {
+          console.error('Voice upload error', err);
+        } finally {
+          // stop tracks from the stream to free mic
+          try {
+            mediaRecorderRef.current?.stream?.getTracks?.().forEach((t) => t.stop());
+          } catch {}
+          mediaRecorderRef.current = null;
+        }
+      };
+
+      // store stream on recorder (some browsers allow access)
+      try { recorder.stream = stream; } catch {}
+
+      recorder.start();
+      setIsRecording(true);
+    } catch (err) {
+      console.error('Mic access error', err);
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = () => {
+    try {
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    } catch (err) {
+      console.error('stopRecording error', err);
+    } finally {
+      setIsRecording(false);
+    }
+  };
+
+  /***** ==== UI RENDER ====*****/
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-indigo-700 via-purple-700 to-pink-500 text-white">
       {/* Header */}
       <header className="bg-white/10 backdrop-blur-sm p-4 text-xl font-semibold flex justify-between items-center">
+        
+        {/* ✅ ✅ UPDATED HEADER WITH ONLINE / LAST SEEN */}
         <div>
-          🗨️ Chatting as <span className="text-yellow-300">{currentUser?.username || 'You'}</span>
+          🗨️ Chatting as 
+          <span className="text-yellow-300 ml-1">
+            {currentUser?.username || 'You'}
+          </span>
+
+          {userStatuses[currentUser?.id || currentUser?._id]?.online ? (
+            <span className="ml-2 text-green-300">(Online ✅)</span>
+          ) : (
+            <span className="ml-2 text-white/70 text-sm">
+              Last seen:{' '}
+              {userStatuses[currentUser?.id || currentUser?._id]?.lastSeen
+                ? new Date(
+                    userStatuses[currentUser?.id || currentUser?._id]?.lastSeen
+                  ).toLocaleTimeString()
+                : '—'}
+            </span>
+          )}
         </div>
 
         <div className="flex gap-4 text-2xl items-center">
@@ -392,7 +500,10 @@ export default function ChatPage() {
           const username = sender.username;
 
           const isSelf = String(senderId) === String(currentUser?.id || currentUser?._id);
+          // detect images
           const isImage = msg.file?.match(/\.(jpg|jpeg|png|gif)$/i);
+          // detect audio (webm/mp3/wav/ogg)
+          const isAudio = msg.file?.match(/\.(webm|mp3|wav|ogg)$/i);
 
           return (
             <div key={msg._id || i} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
@@ -409,7 +520,10 @@ export default function ChatPage() {
                   {msg.text && <div>{msg.text}</div>}
                   {msg.file && (
                     <div className="mt-2">
-                      {isImage ? (
+                      {isAudio ? (
+                        // audio player for voice messages
+                        <audio controls src={API_BASE_URL + msg.file} className="mt-2 w-full" />
+                      ) : isImage ? (
                         <img
                           src={API_BASE_URL + msg.file}
                           alt="uploaded"
@@ -465,6 +579,20 @@ export default function ChatPage() {
           <span className="text-lg font-bold">+</span>
           <input type="file" onChange={handleFileChange} className="absolute inset-0 opacity-0" />
         </label>
+
+        {/* ===== VOICE RECORD (HOLD-TO-RECORD) BUTTON ADDED ===== */}
+        <button
+          type="button"
+          onMouseDown={startRecording}
+          onMouseUp={stopRecording}
+          onMouseLeave={() => { if (isRecording) stopRecording(); }}
+          onTouchStart={startRecording}
+          onTouchEnd={stopRecording}
+          className={`px-3 py-2 rounded-lg ${isRecording ? 'bg-red-500' : 'bg-white/20'} text-white`}
+          title={isRecording ? 'Recording... release to send' : 'Hold to record voice'}
+        >
+          🎤
+        </button>
 
         <button className="bg-yellow-300 text-purple-800 px-4 rounded-lg font-semibold">
           Send

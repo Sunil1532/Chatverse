@@ -1,5 +1,3 @@
-// backend/socket.js
-
 import Message from './models/Message.js';
 import Room from './models/Room.js';
 import { verifySocketJWT } from './middlewares/auth.js';
@@ -13,17 +11,28 @@ export default function socketHandler(io) {
   io.on('connection', async (socket) => {
     console.log('✅ New socket connected:', socket.id);
 
+    // ✅✅ Mark user online instantly
+    await User.findByIdAndUpdate(socket.userId, {
+      online: true,
+      lastSeen: new Date()
+    });
+
+    // ✅ Notify all frontend clients
+    io.emit('userStatus', {
+      userId: socket.userId,
+      online: true,
+      lastSeen: new Date()
+    });
+
     // Join room
     socket.on('joinRoom', async ({ roomId }) => {
       try {
         socket.join(roomId);
         console.log(`User ${socket.userId} joined room ${roomId}`);
 
-        // Fetch and store username on the socket
         const user = await User.findById(socket.userId);
         socket.username = user?.username || 'User';
 
-        // Add user to room members if not already
         const room = await Room.findById(roomId);
         if (room && !room.members.includes(socket.userId)) {
           room.members.push(socket.userId);
@@ -34,7 +43,7 @@ export default function socketHandler(io) {
       }
     });
 
-    // Handle chat message (text + optional file)
+    // Handle chat message
     socket.on('chatMessage', async ({ roomId, text, file }) => {
       try {
         console.log("📥 Received chatMessage:", text, "with file:", file, "from user", socket.userId);
@@ -85,31 +94,24 @@ export default function socketHandler(io) {
       }
     });
 
-    // ======== New WebRTC signaling / call events ========
-    // Caller/participant will call 'joinCall' to start/join the call room for roomId
+    // WebRTC signaling
     socket.on('joinCall', async ({ roomId }) => {
       try {
         const callRoom = `call_${roomId}`;
         socket.join(callRoom);
 
-        // gather other participants in the call room
         const clients = Array.from(io.sockets.adapter.rooms.get(callRoom) || []);
         const otherClients = clients.filter(id => id !== socket.id);
 
-        // send back existing participants so the caller can create offers
         socket.emit('all-call-users', otherClients);
-
-        // notify others that a new user joined call
         socket.to(callRoom).emit('user-joined-call', { socketId: socket.id });
       } catch (err) {
         console.error('❌ joinCall error:', err);
       }
     });
 
-    // Generic signal forwarder: payload signal can be { type: 'offer'|'answer'|'ice', sdp?, candidate? }
     socket.on('signal', ({ to, from, signal }) => {
       if (!to) return;
-      // forward to specific socket id
       io.to(to).emit('signal', { from, signal });
     });
 
@@ -123,17 +125,29 @@ export default function socketHandler(io) {
       }
     });
 
-    // When socket disconnects, notify all call rooms they were part of
-    socket.on('disconnect', () => {
+    // ✅✅ UPDATED disconnect handler
+    socket.on('disconnect', async () => {
       console.log(`🔌 Socket disconnected: ${socket.id}`);
-      // find rooms this socket was in and emit user-left-call for any call_ rooms
+
+      // ✅ Update status in DB
+      await User.findByIdAndUpdate(socket.userId, {
+        online: false,
+        lastSeen: new Date()
+      });
+
+      // ✅ Notify all frontend clients
+      io.emit('userStatus', {
+        userId: socket.userId,
+        online: false,
+        lastSeen: new Date()
+      });
+
+      // Notify call rooms
       socket.rooms.forEach((r) => {
         if (typeof r === 'string' && r.startsWith('call_')) {
           socket.to(r).emit('user-left-call', { socketId: socket.id });
         }
       });
     });
-
-    // ======== end signaling ========
   });
 }
