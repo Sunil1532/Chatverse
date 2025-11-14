@@ -3,7 +3,6 @@ import { useParams } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { FaPhone, FaVideo, FaTimes, FaMicrophoneSlash, FaMicrophone, FaStopCircle, FaVideoSlash } from 'react-icons/fa';
 
-// ✅ Backend URLs
 const API_BASE_URL = 'https://chatverse-8ka6.onrender.com';
 const SOCKET_URL = 'https://chatverse-8ka6.onrender.com';
 
@@ -15,7 +14,7 @@ export default function ChatPage() {
   const [file, setFile] = useState(null);
   const [typingUser, setTypingUser] = useState(null);
 
-  // ✅ ✅ NEW STATE ADDED (Online + Last Seen)
+  
   const [userStatuses, setUserStatuses] = useState({});
 
   const messagesEndRef = useRef();
